@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>变直径管道</title>
+    <script
+      async
+      src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"
+    ></script>
+  </head>
+
+  <body style="margin:0">
+    <script type="module">
+      import * as THREE from "./three/three.module.js";
+      import { VarTubeGeometry, Box3Grid, LineD3, AreaD3 } from "./tool/VarTubeGeometry.js";
+      import { Lut } from "./three/plugins/Lut.js";
+      import { OrbitControls } from "./three/plugins/OrbitControls.js";
+      window.THREE = THREE;
+      // 创建场景
+      var scene = new THREE.Scene();
+      // 辅助坐标系  参数250表示坐标系大小，可以根据场景大小去设置
+      var axisHelper = new THREE.AxesHelper(120);
+      scene.add(axisHelper);
+
+      //点光源
+      var point = new THREE.PointLight(0xffffff);
+      point.position.set(400, 200, 300); //点光源位置
+      scene.add(point); //点光源添加到场景中
+
+      //环境光
+      var ambient = new THREE.AmbientLight(0x444444);
+      scene.add(ambient);
+
+      var width = window.innerWidth; //窗口宽度
+      var height = window.innerHeight; //窗口高度
+      var k = width / height; //窗口宽高比
+      var s = 200; //三维场景显示范围控制系数，系数越大，显示的范围越大
+      //创建相机对象
+      var camera = new THREE.PerspectiveCamera(45, width / height, 1, 10000);
+      //new THREE.OrthographicCamera(-s * k, s * k, s, -s, 1, 1000); //前四个参数定义的是拍照窗口大小
+      camera.position.set(200, 300, 200); //设置相机位置
+      camera.lookAt(scene.position); //设置相机方向(指向的场景对象)
+      var renderer = new THREE.WebGLRenderer({
+        antialias: true,
+      });
+      var anisotropy = renderer.capabilities.getMaxAnisotropy();
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.setSize(width, height); //设置渲染区域尺寸
+      renderer.setClearColor(0xb9d3ff, 1); //设置背景颜色
+      document.body.appendChild(renderer.domElement); //body元素中插入canvas对象
+
+      // 井轨迹 curve 对象
+      var curve = new THREE.CatmullRomCurve3(
+        [
+          [10, 20, 15],
+          [16, 10, 20],
+          [10, 0, 35],
+          [45, 30, 20],
+          [86, 60, 63],
+          [93, 20, 67],
+          [10, 60, 55],
+        ].map((el) => new THREE.Vector3(...el))
+      );
+
+      // 设置参数
+      var radiusArr = [];
+      var toMin = 3;
+      var toMax = 5.5;
+      var dataMin = 0;
+      var dataMax = 20;
+      let valuesArr = [dataMin, dataMax];
+      let mapValuesArr = [1, 1.5];
+      // ----
+      for (var a = 0; a < curve.getLength(); a++) {
+        radiusArr.push([a, dataMin + Math.random() * (dataMax - dataMin)]);
+      }
+
+      // 辅助网格
+      const box = new Box3Grid(
+        {
+          anisotropy,
+          minRange: new THREE.Vector3(0, 0, 0),
+          maxRange: new THREE.Vector3(100, 100, 100),
+          fontSize: 4,
+          lineWidth: 1,
+          scale: 10,
+          fontColor: new THREE.Color(0xff0000),
+          xName: "X",
+          yName: "Y",
+          zName: "Z",
+        },
+        null,
+        (value) => value
+      );
+
+      window.bbox = box;
+      box.addToScene(scene);
+
+      // 颜色
+      const LUT = new Lut("rainbow", 128);
+      LUT.setMax(dataMax);
+      LUT.setMin(dataMin);
+      // 变径管道
+      var _geo = new VarTubeGeometry(
+        curve,
+        radiusArr,
+        20,
+        valuesArr,
+        mapValuesArr,
+        LUT
+      );
+      // 变径管道材质
+      let _baseMaterial = new THREE.MeshPhongMaterial({
+        // color: 0xffff00,
+        side: THREE.DoubleSide,
+        // map: texture
+        vertexColors: true,
+      });
+      var _mesh = new THREE.Mesh(_geo, _baseMaterial);
+      scene.add(_mesh);
+
+      function done(point, m) {
+        const geo = new THREE.BufferGeometry();
+        geo.setFromPoints(point);
+        const mesh = new THREE.Line(geo, m);
+        mesh.computeLineDistances();
+        scene.add(mesh);
+      }
+      // LineD3 折线图
+      var points = new LineD3({
+        line: curve,
+        wellLength: curve.getLength(),
+        toMin,
+        toMax,
+        dataMin,
+        dataMax,
+        arrRadius: radiusArr,
+        angle: Math.PI,
+      });
+      var material = new THREE.LineBasicMaterial({
+        color: 0xff0000,
+      });
+      var _material = new THREE.LineDashedMaterial({
+        color: "#ffffff",
+        dashSize: 1,
+        gapSize: 1,
+      });
+      done(points.linePoints, material);
+      done(points.inlinePoints, _material);
+      done(points.outLinePoints, _material);
+
+      //----------
+
+      // 区域图
+
+      var AreaData = new AreaD3({
+        line: curve,
+        wellLength: curve.getLength(),
+        toMin,
+        toMax,
+        dataMin,
+        dataMax,
+        lut: LUT,
+        arrRadius: radiusArr,
+        angle: 0,
+      });
+      done(AreaData.inlinePoints, _material);
+      done(AreaData.outLinePoints, _material);
+      var _areageo = new THREE.BufferGeometry();
+      _areageo.setIndex(AreaData.areaIndexs);
+      _areageo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(AreaData.areaPoints, 3)
+      );
+      _areageo.setAttribute(
+        "normal",
+        new THREE.Float32BufferAttribute(AreaData.areaNormals, 3)
+      );
+      _areageo.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(AreaData.areaColors, 3)
+      );
+
+      var _areamesh = new THREE.Mesh(
+        _areageo,
+        new THREE.MeshBasicMaterial({
+          // color: 0xffff00,
+          side: THREE.DoubleSide,
+          // map: texture
+          vertexColors: true,
+        })
+      );
+      scene.add(_areamesh);
+
+      function render() {
+        renderer.render(scene, camera); //执行渲染操作
+        point.position.copy(camera.position);
+        box.upDate(camera);
+        // mesh.rotateY(0.01);//每次绕y轴旋转0.01弧度
+        requestAnimationFrame(render); //请求再次执行渲染函数render
+      }
+      render();
+      var controls = new OrbitControls(camera, renderer.domElement); //创建控件对象
+      controls.target.fromArray(box.position);
+    </script>
+  </body>
+</html>

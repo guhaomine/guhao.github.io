@@ -1,0 +1,29 @@
+{
+  "name": "guhao.github.io",
+  "version": "1.0.0",
+  "description": "leave something",
+  "main": "src",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "dev": "servez -p 8080",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guhaomine/guhao.github.io.git"
+  },
+  "author": "guhao",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/guhaomine/guhao.github.io/issues"
+  },
+  "homepage": "https://github.com/guhaomine/guhao.github.io#readme",
+  "dependencies": {
+    "three": "^0.144.0"
+  },
+  "devDependencies": {
+    "servez": "^1.14.1"
+  }
+}
