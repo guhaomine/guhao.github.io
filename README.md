@@ -1,2 +1,2 @@
-# guhao.github.io
-leave something
+# Page
+[View](https://guhaomine.github.io/pages)
